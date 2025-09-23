@@ -1,0 +1,95 @@
+pipeline {
+    agent any
+
+    environment {
+        PATH = "$HOME/.cargo/bin:$PATH"
+        RUST_BACKTRACE = '1'
+        RUSTFLAGS = '-D warnings'
+    }
+
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        timeout(time: 30, unit: 'MINUTES')
+        timestamps()
+        ansiColor('xterm')
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                git branch: 'develop', credentialsId: 'github-integrations', url: 'https://github.com/anhvdq/8.1CDevSecOps.git'
+            }
+        }
+
+        stage('Build') {
+            steps {
+                echo "🔨 Building project..."
+                sh '''
+                    cargo clean
+                    cargo build
+                '''
+            }
+        }
+
+        stage('Tests & Checks') {
+            parallel {
+                stage('Unit Tests') {
+                    steps {
+                        sh '''
+                            echo "🧪 Running unit tests..."
+                            cargo test --lib --bins --verbose -- --nocapture
+                        '''
+                    }
+                }
+
+                stage('Integration Tests') {
+                    steps {
+                        sh '''
+                            echo "🔗 Running integration tests..."
+                            cargo test --test '*' --verbose -- --nocapture
+                        '''
+                    }
+                }
+
+                stage('Clippy Lint') {
+                    steps {
+                        sh '''
+                            echo "🔍 Running Clippy..."
+                            cargo clippy --all-targets --all-features -- -D warnings
+                        '''
+                    }
+                }
+
+                stage('Security Audit') {
+                    steps {
+                        sh '''
+                            echo "🔒 Running security audit..."
+                            cargo audit
+                        '''
+                    }
+                }
+
+                stage('License Check') {
+                    steps {
+                        sh '''
+                            echo "📋 Checking licenses..."
+                            cargo license || echo "License check completed"
+                        '''
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            sh 'cargo clean'
+        }
+        success {
+            echo "🎉 All checks passed!"
+        }
+        failure {
+            echo "❌ Pipeline failed"
+        }
+    }
+}
