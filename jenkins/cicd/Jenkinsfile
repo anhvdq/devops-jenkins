@@ -2,9 +2,11 @@ pipeline {
     agent any
 
     environment {
-        PATH = "$HOME/.cargo/bin:$PATH"
-        RUST_BACKTRACE = '1'
-        RUSTFLAGS = '-D warnings'
+        PG_DATABASE_HOST = 'localhost'
+        PG_DATABASE_PORT = '5432'
+        PG_DATABASE_DB = 'apidb'
+        PG_DATABASE_USERNAME = 'postgres'
+        PG_DATABASE_PASSWORD = 'postgres'
     }
 
     options {
@@ -22,9 +24,8 @@ pipeline {
 
         stage('Build') {
             steps {
-                echo "🔨 Building project..."
+                echo "Building project..."
                 sh '''
-                    cargo clean
                     cargo build
                 '''
             }
@@ -35,7 +36,7 @@ pipeline {
                 stage('Unit Tests') {
                     steps {
                         sh '''
-                            echo "🧪 Running unit tests..."
+                            echo "...Running unit tests..."
                             cargo test --lib --bins --verbose -- --nocapture
                         '''
                     }
@@ -44,7 +45,7 @@ pipeline {
                 stage('Integration Tests') {
                     steps {
                         sh '''
-                            echo "🔗 Running integration tests..."
+                            echo "...Running integration tests..."
                             cargo test --test '*' --verbose -- --nocapture
                         '''
                     }
@@ -53,7 +54,7 @@ pipeline {
                 stage('Clippy Lint') {
                     steps {
                         sh '''
-                            echo "🔍 Running Clippy..."
+                            echo "...Running Clippy..."
                             cargo clippy --all-targets --all-features -- -D warnings
                         '''
                     }
@@ -62,7 +63,7 @@ pipeline {
                 stage('Security Audit') {
                     steps {
                         sh '''
-                            echo "🔒 Running security audit..."
+                            echo "...Running security audit..."
                             cargo audit
                         '''
                     }
@@ -71,7 +72,7 @@ pipeline {
                 stage('License Check') {
                     steps {
                         sh '''
-                            echo "📋 Checking licenses..."
+                            echo "...Checking licenses..."
                             cargo license || echo "License check completed"
                         '''
                     }
@@ -81,14 +82,11 @@ pipeline {
     }
 
     post {
-        always {
-            sh 'cargo clean'
-        }
         success {
-            echo "🎉 All checks passed!"
+            echo "All checks passed!"
         }
         failure {
-            echo "❌ Pipeline failed"
+            echo "Pipeline failed"
         }
     }
 }
