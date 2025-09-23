@@ -16,7 +16,7 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'develop', credentialsId: 'github-integrations', url: 'https://github.com/anhvdq/8.1CDevSecOps.git'
+                git branch: 'staging', credentialsId: 'github-integrations', url: 'https://github.com/anhvdq/devops-jenkins'
             }
         }
 
