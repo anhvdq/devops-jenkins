@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        PG_DATABASE_HOST = 'localhost'
+        PG_DATABASE_HOST = 'db'
         PG_DATABASE_PORT = '5432'
         PG_DATABASE_DB = 'apidb'
         PG_DATABASE_USERNAME = 'postgres'
