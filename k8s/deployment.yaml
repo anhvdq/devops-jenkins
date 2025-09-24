@@ -1,0 +1,94 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-service
+  labels:
+    app: web-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web-service
+  template:
+    metadata:
+      labels:
+        app: web-service
+    spec:
+      imagePullSecrets:
+        - name: ghcr-secret
+      containers:
+        - name: web-service
+          image: ghcr.io/anhvdq/web-service:${IMAGE_VERSION}
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+          env:
+            - name: APP_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: web-service-config
+                  key: APP_PORT
+            - name: APP_LOG
+              valueFrom:
+                configMapKeyRef:
+                  name: web-service-config
+                  key: APP_LOG
+            - name: PG_DATABASE_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: web-service-config
+                  key: PG_DATABASE_HOST
+            - name: PG_DATABASE_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: web-service-config
+                  key: PG_DATABASE_PORT
+            - name: PG_DATABASE_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: web-service-config
+                  key: PG_DATABASE_DB
+            - name: PG_DATABASE_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: web-service-config
+                  key: PG_DATABASE_USERNAME
+            - name: PG_DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: password
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+          livenessProbe:
+            httpGet:
+              path: /health-check
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health-check
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-service
+  labels:
+    app: web-service
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 3000
+      targetPort: 3000
+      protocol: TCP
+  selector:
+    app: web-service
