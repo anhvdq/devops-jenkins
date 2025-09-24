@@ -135,6 +135,6 @@ mod tests {
     fn test_routes_creation() {
         let service: UserService = Arc::new(MockUserService);
         let router = routes(service);
-        assert!(!format!("{:?}", router).is_empty());
+        assert!(!format!("{router:?}").is_empty());
     }
 }

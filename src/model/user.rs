@@ -41,11 +41,6 @@ pub struct UpdateUserDto {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpdateUserPermissionDto {
-    pub permissions: Vec<i32>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReadUserDto {
     pub id: i32,
     pub name: String,

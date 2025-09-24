@@ -9,7 +9,7 @@ axum = { version = "0.8.4", features = ["macros"] }
 axum-extra = { version = "0.10.1", features = ["typed-header", "form"] }
 axum_typed_multipart = "0.16.3"
 bcrypt = "0.17.0"
-dotenv = "0.15.0"
+dotenvy = "0.15.7"
 jsonwebtoken = "9.3.1"
 serde = "1.0.219"
 sqlx = { version = "0.8.6", features = ["runtime-tokio", "tls-native-tls", "postgres", "migrate"] }

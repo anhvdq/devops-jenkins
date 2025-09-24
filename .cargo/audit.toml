@@ -1,0 +1,4 @@
+[advisories]
+ignore = [
+    "RUSTSEC-2023-0071"     # False alarm about sqlx-mysql library which is not used in this project
+]
