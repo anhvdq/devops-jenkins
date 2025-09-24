@@ -2,11 +2,19 @@ pipeline {
     agent any
 
     environment {
+        APP_NAME = 'web-service'
+
+        GITHUB_REPO = 'https://github.com/anhvdq/devops-jenkins'
+        GITHUB_CREDENTIALS = 'github-integrations'
+        GITHUB_REGISTRY = 'ghcr.io/anhvdq'
+
         PG_DATABASE_HOST = 'db'
         PG_DATABASE_PORT = '5432'
         PG_DATABASE_DB = 'apidb'
         PG_DATABASE_USERNAME = 'postgres'
         PG_DATABASE_PASSWORD = 'postgres'
+
+        KUBECONFIG = credentials('k8s-staging')
     }
 
     options {
@@ -18,65 +26,109 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'staging', credentialsId: 'github-integrations', url: 'https://github.com/anhvdq/devops-jenkins'
+                git branch: 'staging', credentialsId: GITHUB_CREDENTIALS, url: GITHUB_REPO
             }
         }
 
         stage('Build') {
             steps {
-                echo "Building project..."
-                sh '''
-                    cargo build
-                '''
+                script {
+                    echo "...Building project..."
+                    def version = sh(script: 'cargo pkgid | cut -d "@" -f2', returnStdout: true).trim()
+                    env.VERSION = version
+                    sh "cargo build"
+                }
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh "docker buildx build --tag ${APP_NAME}:${env.VERSION} --tag ${GITHUB_REGISTRY}/${APP_NAME}:${env.VERSION} --build-arg APP_NAME=${APP_NAME} --load ."
             }
         }
 
         stage('Tests & Checks') {
-            parallel {
+            stages {
                 stage('Unit Tests') {
                     steps {
-                        sh '''
-                            echo "...Running unit tests..."
-                            cargo test --lib --bins --verbose -- --nocapture
-                        '''
+                        catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
+                            sh '''
+                                echo "...Running unit tests..."
+                                cargo test --lib --bins -- --nocapture
+                            '''
+                        }
                     }
                 }
-
                 stage('Integration Tests') {
                     steps {
-                        sh '''
-                            echo "...Running integration tests..."
-                            cargo test --test '*' --verbose -- --nocapture
-                        '''
+                        catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
+                            sh '''
+                                echo "...Running integration tests..."
+                                cargo test --test '*' -- --nocapture
+                            '''
+                        }
                     }
                 }
-
                 stage('Clippy Lint') {
                     steps {
-                        sh '''
-                            echo "...Running Clippy..."
-                            cargo clippy --all-targets --all-features -- -D warnings
-                        '''
+                        catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
+                            sh '''
+                                echo "...Running Clippy..."
+                                cargo clippy --all-targets --all-features -- -D warnings
+                            '''
+                        }
                     }
                 }
-
                 stage('Security Audit') {
                     steps {
-                        sh '''
-                            echo "...Running security audit..."
-                            cargo audit
-                        '''
+                        catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
+                            sh '''
+                                echo "...Running security audit..."
+                                cargo audit
+                            '''
+                        }
+                    }
+                }
+                stage('License Check') {
+                    steps {
+                        catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
+                            sh '''
+                                echo "...Checking licenses..."
+                                cargo license || echo "License check completed"
+                            '''
+                        }
                     }
                 }
 
-                stage('License Check') {
+                stage('Security Scan with Trivy') {
                     steps {
-                        sh '''
-                            echo "...Checking licenses..."
-                            cargo license || echo "License check completed"
+                        sh '''#!/bin/bash
+                            echo "Scanning image with Trivy..."
+
+                            # Fail only on MEDIUM, HIGH and CRITICAL vulnerabilities
+                            trivy image --exit-code 1 --format table --severity HIGH,CRITICAL,MEDIUM ${APP_NAME}:${VERSION}
                         '''
+
+                        // Archive the security report
+                        archiveArtifacts artifacts: 'trivy-report.json', fingerprint: true
                     }
                 }
+            }
+        }
+
+        stage('Push to GitHub Container Registry') {
+            steps {
+                script {
+                    docker.withRegistry('https://ghcr.io', 'github-integrations') {
+                        docker.image("${env.GITHUB_REPOSITORY}/${env.APP_NAME}:${env.VERSION}").push()
+                    }
+                }
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                sh("export IMAGE_VERSION=${env.VERSION} && envsubst < k8s/deployment.yaml | kubectl apply -f -")
             }
         }
     }

@@ -1,20 +1,22 @@
-version: "3.8"
-
 services:
   jenkins:
-    image: localhost/jenkins-custom:latest
+    image: jenkins-custom:latest
     container_name: jenkins-custom
     restart: unless-stopped
+    privileged: true
+    security_opt:
+      - label:disable
     ports:
       - "8080:8080"
       - "50000:50000"
     volumes:
       - jenkins_home:/var/jenkins_home
-      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/run/docker.sock:/var/run/docker.sock:rw
     environment:
       - JENKINS_OPTS=--httpPort=8080
-    networks:
-      - jenkins
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
   db:
     image: postgres
     restart: always
@@ -24,13 +26,9 @@ services:
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_USER=postgres
       - POSTGRES_DB=apidb
-    networks:
-      - jenkins
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
 volumes:
   jenkins_home:
     driver: local
-
-networks:
-  jenkins:
-    driver: bridge
