@@ -102,15 +102,14 @@ pipeline {
 
                 stage('Security Scan with Trivy') {
                     steps {
-                        sh '''#!/bin/bash
-                            echo "Scanning image with Trivy..."
+                        catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
+                            sh '''#!/bin/bash
+                                echo "Scanning image with Trivy..."
 
-                            # Fail only on MEDIUM, HIGH and CRITICAL vulnerabilities
-                            trivy image --exit-code 1 --format table --severity HIGH,CRITICAL,MEDIUM ${APP_NAME}:${VERSION}
-                        '''
-
-                        // Archive the security report
-                        archiveArtifacts artifacts: 'trivy-report.json', fingerprint: true
+                                # Fail only on MEDIUM, HIGH and CRITICAL vulnerabilities
+                                trivy image --exit-code 1 --format table --severity HIGH,CRITICAL,MEDIUM ${APP_NAME}:${VERSION}
+                            '''
+                        }
                     }
                 }
             }
@@ -120,7 +119,7 @@ pipeline {
             steps {
                 script {
                     docker.withRegistry('https://ghcr.io', 'github-integrations') {
-                        docker.image("${env.GITHUB_REPOSITORY}/${env.APP_NAME}:${env.VERSION}").push()
+                        docker.image("${env.GITHUB_REGISTRY}/${env.APP_NAME}:${env.VERSION}").push()
                     }
                 }
             }
